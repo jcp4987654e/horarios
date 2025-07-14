@@ -31,20 +31,3 @@ else:
     st.error(f"Error: No se encontró el archivo '{html_file_path}'.")
     st.warning("Por favor, asegúrate de que el archivo HTML del horario esté en la misma carpeta que este script de Python y que se llame 'horario.html'.")
     st.info("Puedes obtener el código HTML del Canvas anterior.")
-
-# --- Instrucciones de uso ---
-st.sidebar.header("Instrucciones")
-st.sidebar.markdown("""
-1.  **Guarda el código** del Canvas anterior en un archivo llamado `horario.html`.
-2.  **Guarda este código** de Python en un archivo (por ejemplo, `app.py`) en la **misma carpeta**.
-3.  Abre una terminal o línea de comandos.
-4.  Navega a la carpeta donde guardaste los archivos.
-5.  Instala Streamlit si no lo has hecho:
-    ```bash
-    pip install streamlit
-    ```
-6.  Ejecuta la aplicación con el comando:
-    ```bash
-    streamlit run app.py
-    ```
-""")
