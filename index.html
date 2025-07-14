@@ -3,530 +3,279 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Planificador de Puesta a Tierra TT (AEA) v13.0</title>
+    <title>Mi Horario Semanal Interactivo</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        window.MathJax = { tex: { inlineMath: [['$', '$']], displayMath: [['$$', '$$']] }, svg: { fontCache: 'global' } };
-    </script>
-    <script type="text/javascript" id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Librerías para exportar a PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf-autotable.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #111827; color: #d1d5db; }
-        .tab-button.active { border-color: #3b82f6; color: #3b82f6; background-color: #1f2937; }
-        .tab-button { border-color: #4b5563; }
-        .result-section, .mode-section { display: none; }
-        .loader { border: 4px solid #4b5563; border-top: 4px solid #3b82f6; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 2rem auto; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        #export-content { position: absolute; left: -9999px; top: -9999px; }
-        .sector-card, .info-card { animation: fadeIn 0.5s ease-in-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-        /* Custom scrollbar */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #1f2937; }
-        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+        body {
+            font-family: 'Poppins', sans-serif;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .table-cell-animate {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f7fafc; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a0aec0; }
+        
+        .table-container {
+            max-height: 75vh;
+            overflow: auto;
+            border-radius: 1rem;
+        }
+        td {
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+        }
+        td:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            z-index: 10;
+            position: relative;
+        }
     </style>
 </head>
-<body class="bg-gray-900 text-gray-200">
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 p-4 sm:p-6 lg:p-8">
 
-    <div class="container mx-auto p-4 md:p-8 relative">
-        
-        <button id="fullscreenBtn" class="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors" title="Activar/Desactivar pantalla completa">
-            <svg id="fullscreen-enter-icon" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 1v4m0 0h-4m4 0l-5-5"></path></svg>
-            <svg id="fullscreen-exit-icon" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 4H4v6m0-6l6 6m10 10h-6v-6m0 6l-6-6"></path></svg>
-        </button>
-
-        <header class="text-center mb-8">
-            <h1 class="text-3xl md:text-4xl font-bold text-white">Planificador de Puesta a Tierra (Esquema TT)</h1>
-            <p class="text-gray-400 mt-2">Diseño de proyecto según reglamentación AEA 90364.</p>
+    <div id="main-container" class="max-w-screen-xl mx-auto bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 transition-all duration-300">
+        <header class="text-center mb-6">
+            <h1 class="text-3xl sm:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-indigo-600">🗓️ Mi Horario Semanal</h1>
+            <p class="text-gray-500 dark:text-gray-400 mt-2">Intervalos de 30 minutos. ¡Haz clic en una celda para editarla!</p>
         </header>
 
-        <div class="grid grid-cols-1 md:grid-cols-12 gap-8">
+        <div class="flex justify-center items-center space-x-4 mb-6">
+            <button onclick="exportToPDF()" class="bg-gradient-to-r from-teal-400 to-blue-500 hover:from-teal-500 hover:to-blue-600 text-white font-bold py-2 px-5 rounded-lg flex items-center space-x-2 transition-transform transform hover:scale-105 shadow-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                <span>Exportar PDF</span>
+            </button>
+            <button onclick="toggleFullscreen()" class="bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white font-bold py-2 px-5 rounded-lg flex items-center space-x-2 transition-transform transform hover:scale-105 shadow-lg">
+                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 0h-4m4 0l-5-5" /></svg>
+                <span>Pantalla Completa</span>
+            </button>
+        </div>
 
-            <!-- Columna de Parámetros -->
-            <div class="md:col-span-4 bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-lg">
-                <div>
-                    <label for="mode_selector" class="block text-sm font-medium text-gray-300 mb-2">Modo de Calculadora</label>
-                    <select id="mode_selector" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2">
-                        <option value="domiciliaria" selected>Verificación Domiciliaria</option>
-                        <option value="proyecto">Proyecto Completo (Multi-Sector)</option>
-                    </select>
-                </div>
-                
-                <hr class="border-gray-600 my-6">
+        <div id="schedule-container" class="table-container shadow-inner">
+            <!-- El horario se generará aquí -->
+        </div>
+    </div>
 
-                <!-- Parámetros Comunes -->
-                <div class="space-y-6">
-                    <h2 class="text-2xl font-semibold -mt-2">1. Parámetros Generales</h2>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-300 mb-2">Condiciones / Tensión Límite ($U_L$)</label>
-                        <select id="ul_condition" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2">
-                            <option value="24" selected>Común / Sin supervisión (UL = 24V)</option>
-                            <option value="50">Seco / Personal capacitado (UL = 50V)</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label for="tipo_suelo" class="block text-sm font-medium text-gray-300 mb-2">Resistividad del Terreno (ρ)</label>
-                        <select id="tipo_suelo" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 mb-2">
-                            <option value="10" selected>Arcillas (10 Ω·m)</option>
-                            <option value="5">Aluvial (5 Ω·m)</option>
-                            <option value="20">Greda (20 Ω·m)</option>
-                            <option value="50">T. calcárea (50 Ω·m)</option>
-                            <option value="100">Arenisca (100 Ω·m)</option>
-                            <option value="custom">Ingresar valor manual...</option>
-                        </select>
-                        <input type="number" id="resistividad_manual" placeholder="Ej: 80" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 hidden">
-                    </div>
-                </div>
-                
-                <!-- Modo Domiciliaria -->
-                <div id="mode_domiciliaria" class="mode-section mt-8 space-y-6">
-                    <h2 class="text-2xl font-semibold border-b border-gray-600 pb-3">2. Puesta a Tierra a Verificar</h2>
-                    <div class="space-y-3">
-                         <label class="text-sm font-medium text-gray-300">Sensibilidad Diferencial (IΔn)</label>
-                        <select id="domiciliaria_rcd" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2">
-                            <option value="30" selected>30 mA</option><option value="100">100 mA</option><option value="300">300 mA</option>
-                            <option value="500">500 mA</option><option value="1000">1 A</option>
-                        </select>
-                         <div class="mt-2">
-                            <label class="flex items-center space-x-2 text-sm cursor-pointer">
-                                <input type="checkbox" id="domiciliaria_manual_obj_check" class="form-checkbox h-4 w-4 text-blue-600 bg-gray-700 border-gray-500 rounded">
-                                <span>Usar objetivo manual de resistencia</span>
-                            </label>
-                            <input type="number" id="domiciliaria_manual_obj_input" placeholder="Ej: 5 Ω" class="w-full bg-gray-600 border-gray-500 rounded-md px-3 py-1.5 mt-2 hidden">
-                        </div>
-                    </div>
-                    <div>
-                         <label class="text-sm font-medium text-gray-300">Jabalina a Instalar</label>
-                        <div class="grid grid-cols-2 gap-2 mt-2">
-                            <select id="domiciliaria_l" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2"><option value="1.5">1.5m</option><option value="3" selected>3m</option></select>
-                            <select id="domiciliaria_d" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2"><option value="0.0127">1/2"</option><option value="0.0158">5/8"</option><option value="0.01905" selected>3/4"</option></select>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Modo Proyecto -->
-                <div id="mode_proyecto" class="mode-section mt-8">
-                     <div class="space-y-6">
-                        <h2 class="text-2xl font-semibold border-b border-gray-600 pb-3">2. Puesta a Tierra de Servicio (RB)</h2>
-                         <p class="text-xs text-gray-400 -mt-2">Sistema para el neutro de la acometida.</p>
-                        <div>
-                             <label class="text-sm font-medium text-gray-300">Jabalina para Servicio</label>
-                            <div class="grid grid-cols-2 gap-2 mt-2">
-                                <select id="proyecto_service_l" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2"><option value="1.5">1.5m</option><option value="3" selected>3m</option></select>
-                                <select id="proyecto_service_d" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2"><option value="0.0127">1/2"</option><option value="0.0158">5/8"</option><option value="0.01905" selected>3/4"</option></select>
-                            </div>
-                        </div>
-                         <div>
-                             <label class="flex items-center space-x-2 text-sm cursor-pointer">
-                                <input type="checkbox" id="proyecto_service_manual_check" class="form-checkbox h-4 w-4 text-blue-600 bg-gray-700 border-gray-500 rounded">
-                                <span>Usar objetivo manual (por defecto ≤ 1.0 Ω)</span>
-                            </label>
-                            <input type="number" id="proyecto_service_manual_input" value="1" placeholder="Ej: 0.8 Ω" class="w-full bg-gray-600 border-gray-500 rounded-md px-3 py-1.5 mt-2 hidden">
-                         </div>
-                    </div>
-                    <h2 class="text-2xl font-semibold border-b border-gray-600 pb-3 mb-4 mt-8">3. Sectores de Protección (RA)</h2>
-                    <div id="sectores-container" class="space-y-4"></div>
-                    <button id="addSectorBtn" class="mt-4 w-full flex items-center justify-center py-2 px-4 border border-dashed border-gray-500 text-sm font-medium rounded-lg text-gray-400 hover:text-white hover:border-white transition">
-                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd"></path></svg>
-                        Añadir Sector
-                    </button>
-                </div>
-
-                <button id="calcularBtn" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg mt-8 hover:bg-blue-700 transition-colors"></button>
-            </div>
-
-            <!-- Columna de Resultados -->
-            <div class="md:col-span-8">
-                <div id="results-container" class="bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-lg min-h-full" style="display: none;"></div>
-                <div id="initial-message" class="flex items-center justify-center bg-gray-800 p-6 rounded-xl border-2 border-dashed border-gray-700 min-h-full">
-                    <div class="text-center">
-                        <svg class="mx-auto h-12 w-12 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                        <h3 class="mt-2 text-lg font-medium text-white">Listo para Planificar</h3>
-                        <p class="mt-1 text-sm text-gray-400">Seleccione el modo de calculadora y complete los parámetros.</p>
-                    </div>
-                </div>
-                <div id="loader-container" class="hidden items-center justify-center bg-gray-800 p-6 rounded-xl"><div class="loader"></div></div>
+    <!-- Modal para editar -->
+    <div id="edit-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 w-full max-w-md transform transition-all duration-300 scale-95 opacity-0" id="modal-content">
+            <h3 class="text-xl font-bold mb-4 text-gray-800 dark:text-white">Editar Actividad</h3>
+            <input type="text" id="task-input" class="w-full p-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition dark:bg-gray-700">
+            <div class="mt-6 flex justify-end space-x-3">
+                <button onclick="closeModal()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg transition-transform transform hover:scale-105">Cancelar</button>
+                <button onclick="saveTask()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition-transform transform hover:scale-105">Guardar</button>
             </div>
         </div>
     </div>
-    <textarea id="export-content"></textarea>
 
-<script>
-    // --- DATABASE & DEFAULTS ---
-    const DB = {
-        soilResistivity: { '10': 'Arcillas', '5': 'Aluvial', '20': 'Greda', '50': 'Tierra calcárea', '100': 'Arenisca' },
-        parallelCoefficients: { 1: 1.0, 2: 0.57, 3: 0.42, 4: 0.33, 5: 0.27, 6: 0.24, 7: 0.21, 8: 0.19, 9: 0.17, 10: 0.15 },
-        aeaTable: { 
-            "50": { "30": 1666, "100": 500, "300": 167, "500": 100, "1000": 50, "3000": 17, "5000": 10, "10000": 5, "20000": 2.5 }, 
-            "24": { "30": 800, "100": 240, "300": 80, "500": 48, "1000": 24, "3000": 8, "5000": 4.8, "10000": 2.4, "20000": 1.2 } 
-        },
-        aeaFinalCap: { "30": 40, "100": 40, "300": 40, "500": 24, "1000": 12, "3000": 4, "5000": 2.4, "10000": 1.2, "20000": 0.6 }
-    };
-    let sectorCount = 0;
-    let currentResults = null;
+    <script>
+        // No es necesario inicializar jsPDF aquí, se hará directamente en la función de exportación.
+        
+        let scheduleData = {
+            'Lunes': [ { start: '00:00', end: '05:59', task: 'Durmiendo' }, { start: '06:00', end: '06:29', task: 'Me despierto' }, { start: '06:30', end: '07:39', task: 'Preparándome' }, { start: '07:40', end: '07:59', task: 'Entro a clases' }, { start: '08:00', end: '14:59', task: 'En clase' }, { start: '15:00', end: '15:39', task: 'Salgo de clase' }, { start: '15:40', end: '15:59', task: 'Llego a casa' }, { start: '16:00', end: '16:59', task: 'Descanso' }, { start: '17:00', end: '17:59', task: 'Libre' }, { start: '18:00', end: '18:59', task: 'Ejercicio' }, { start: '19:00', end: '19:29', task: 'Neotech' }, { start: '19:30', end: '21:29', task: 'Marketing Digital' }, { start: '21:30', end: '22:59', task: 'Libre' }, { start: '23:00', end: '23:59', task: 'Durmiendo' } ],
+            'Martes': [ { start: '00:00', end: '00:29', task: 'Apagar todo' }, { start: '00:30', end: '00:59', task: 'A dormir' }, { start: '01:00', end: '08:29', task: 'Durmiendo' }, { start: '08:30', end: '08:59', task: 'Me despierto' }, { start: '09:00', end: '10:59', task: 'METROGAS' }, { start: '11:00', end: '14:59', task: 'En clase' }, { start: '15:00', end: '15:39', task: 'Salgo de clase' }, { start: '15:40', end: '15:59', task: 'Llego a casa' }, { start: '16:00', end: '21:59', task: 'Libre' }, { start: '22:00', end: '22:29', task: 'Apagar todo' }, { start: '22:30', end: '22:59', task: 'A dormir' }, { start: '23:00', end: '23:59', task: 'Durmiendo' } ],
+            'Miércoles': [ { start: '00:00', end: '05:59', task: 'Durmiendo' }, { start: '06:00', end: '06:29', task: 'Me despierto' }, { start: '06:30', end: '07:39', task: 'Preparándome' }, { start: '07:40', end: '07:59', task: 'Entro a clases' }, { start: '08:00', end: '14:59', task: 'En clase' }, { start: '15:00', end: '15:39', task: 'Salgo de clase' }, { start: '15:40', end: '15:59', task: 'Llego a casa' }, { start: '16:00', end: '16:59', task: 'Descanso' }, { start: '17:00', end: '17:59', task: 'Libre' }, { start: '18:00', end: '18:59', task: 'Ejercicio' }, { start: '19:00', end: '19:29', task: 'Neotech' }, { start: '19:30', end: '21:29', task: 'CS50x Harvard' }, { start: '21:30', end: '22:29', task: 'Libre' }, { start: '22:30', end: '22:59', task: 'A dormir' }, { start: '23:00', end: '23:59', task: 'Durmiendo' } ],
+            'Jueves': [ { start: '00:00', end: '05:59', task: 'Durmiendo' }, { start: '06:00', end: '06:29', task: 'Me despierto' }, { start: '06:30', end: '07:39', task: 'Preparándome' }, { start: '07:40', end: '07:59', task: 'Entro a clases' }, { start: '08:00', end: '14:59', task: 'En clase' }, { start: '15:00', end: '15:39', task: 'Salgo de clase' }, { start: '15:40', end: '15:59', task: 'Llego a casa' }, { start: '16:00', end: '17:59', task: 'Libre' }, { start: '18:00', end: '18:59', task: 'Curso IA' }, { start: '19:00', end: '19:29', task: 'Neotech' }, { start: '19:30', end: '21:29', task: 'Convenio Multilateral' }, { start: '21:30', end: '23:59', task: 'Libre' } ],
+            'Viernes': [ { start: '00:00', end: '00:29', task: 'Apagar todo' }, { start: '00:30', end: '00:59', task: 'A dormir' }, { start: '01:00', end: '08:29', task: 'Durmiendo' }, { start: '08:30', end: '08:59', task: 'Me despierto' }, { start: '09:00', end: '09:29', task: 'Preparándome' }, { start: '09:30', end: '09:59', task: 'Entro a clase' }, { start: '10:00', end: '14:59', task: 'En clase' }, { start: '15:00', end: '15:39', task: 'Salgo de clase' }, { start: '15:40', end: '15:59', task: 'Llego a casa' }, { start: '16:00', end: '18:59', task: 'Ejercicio' }, { start: '19:00', end: '19:29', task: 'Neotech' }, { start: '19:30', end: '21:29', task: 'Monotributo' }, { start: '21:30', end: '23:59', task: 'Libre' } ],
+            'Sábado': [ { start: '00:00', end: '23:59', task: 'Libre' } ],
+            'Domingo': [ { start: '00:00', end: '08:59', task: 'Libre' }, { start: '09:00', end: '16:59', task: 'Durmiendo' }, { start: '17:00', end: '18:59', task: 'Ejercicio' }, { start: '19:00', end: '21:29', task: 'Neotech' }, { start: '21:30', end: '22:29', task: 'Libre' }, { start: '22:30', end: '22:59', task: 'A dormir' }, { start: '23:00', end: '23:59', task: 'Durmiendo' } ]
+        };
 
-    // --- DOM ELEMENTS ---
-    const dom = {
-        mode_selector: document.getElementById('mode_selector'),
-        mode_proyecto: document.getElementById('mode_proyecto'),
-        mode_domiciliaria: document.getElementById('mode_domiciliaria'),
-        tipoSuelo: document.getElementById('tipo_suelo'), resistividadManual: document.getElementById('resistividad_manual'),
-        ul_condition: document.getElementById('ul_condition'),
-        calcularBtn: document.getElementById('calcularBtn'), resultsContainer: document.getElementById('results-container'),
-        initialMessage: document.getElementById('initial-message'),
-        loaderContainer: document.getElementById('loader-container'), fullscreenBtn: document.getElementById('fullscreenBtn'),
-        fullscreenEnter: document.getElementById('fullscreen-enter-icon'), fullscreenExit: document.getElementById('fullscreen-exit-icon'),
-        exportTextarea: document.getElementById('export-content'), addSectorBtn: document.getElementById('addSectorBtn'),
-        sectoresContainer: document.getElementById('sectores-container')
-    };
+        const taskStyles = {
+            'Durmiendo': { emoji: '😴', color: 'hsl(220, 25%, 94%)' }, 'Libre': { emoji: '😎', color: 'hsl(140, 35%, 95%)' }, 'En clase': { emoji: '📚', color: 'hsl(45, 70%, 94%)' }, 'Preparándome': { emoji: '☕', color: 'hsl(30, 65%, 94%)' }, 'Llego a casa': { emoji: '🏡', color: 'hsl(180, 40%, 94%)' }, 'Salgo de clase': { emoji: '🚶‍♂️', color: 'hsl(200, 50%, 95%)' }, 'Descanso': { emoji: '🧘', color: 'hsl(150, 40%, 96%)' }, 'Ejercicio': { emoji: '💪', color: 'hsl(0, 60%, 95%)' }, 'Neotech': { emoji: '�', color: 'hsl(240, 50%, 96%)' }, 'Marketing Digital': { emoji: '📈', color: 'hsl(260, 60%, 96%)' }, 'Convenio Multilateral': { emoji: '📄', color: 'hsl(280, 50%, 97%)' }, 'CS50x Harvard': { emoji: '🎓', color: 'hsl(300, 50%, 97%)' }, 'Monotributo': { emoji: '🧾', color: 'hsl(320, 50%, 97%)' }, 'Curso IA': { emoji: '🤖', color: 'hsl(340, 50%, 97%)' }, 'METROGAS': { emoji: '🔥', color: 'hsl(25, 60%, 95%)' }, 'Apagar todo': { emoji: '🔌', color: 'hsl(220, 20%, 90%)' }, 'A dormir': { emoji: '🛌', color: 'hsl(220, 25%, 92%)' }, 'Entro a clases': { emoji: '🏫', color: 'hsl(40, 70%, 93%)' },
+        };
+        const generatedColors = {};
+        
+        let editingCell = { day: null, timeString: null };
 
-    // --- EVENT LISTENERS ---
-    dom.mode_selector.addEventListener('change', handleModeChange);
-    dom.tipoSuelo.addEventListener('change', () => dom.resistividadManual.classList.toggle('hidden', dom.tipoSuelo.value !== 'custom'));
-    dom.calcularBtn.addEventListener('click', () => {
-        if (dom.mode_selector.value === 'proyecto' && document.querySelectorAll('.sector-card').length === 0) {
-            alert('Debe añadir al menos un sector de protección.'); return;
+        function timeToMinutes(timeStr) {
+            const [hours, minutes] = timeStr.split(':').map(Number);
+            return hours * 60 + minutes;
         }
-        dom.resultsContainer.style.display = 'none';
-        dom.initialMessage.style.display = 'none';
-        dom.loaderContainer.style.display = 'flex';
-        setTimeout(performCalculations, 500);
-    });
-    dom.addSectorBtn.addEventListener('click', addSector);
 
-    // --- INITIALIZATION ---
-    document.addEventListener('DOMContentLoaded', () => { handleModeChange(); addSector(); });
-
-    // --- CORE FUNCTIONS ---
-    function handleModeChange() {
-        const selectedMode = dom.mode_selector.value;
-        document.querySelectorAll('.mode-section').forEach(el => el.style.display = 'none');
-        document.getElementById(`mode_${selectedMode}`).style.display = 'block';
-        dom.resultsContainer.style.display = 'none';
-        dom.initialMessage.style.display = 'flex';
-        dom.calcularBtn.textContent = selectedMode === 'proyecto' ? 'Calcular Proyecto Completo' : 'Verificar Jabalina Domiciliaria';
-    }
-
-    function addSector() {
-        sectorCount++;
-        const sectorId = `sector-${sectorCount}`;
-        const newSector = document.createElement('div');
-        newSector.className = 'sector-card bg-gray-700 p-4 rounded-lg border border-gray-600';
-        newSector.id = sectorId;
-        newSector.innerHTML = `
-            <div class="flex justify-between items-center mb-3">
-                <h4 class="font-semibold text-white">Sector de Protección #${sectorCount}</h4>
-                <button onclick="removeSector('${sectorId}')" class="text-gray-500 hover:text-red-400 text-2xl leading-none">&times;</button>
-            </div>
-            <div class="space-y-3">
-                <input type="text" placeholder="Nombre (Ej: Taller)" class="sector-name w-full bg-gray-600 border border-gray-500 rounded-md px-3 py-1.5 text-sm" value="Sector ${sectorCount}">
-                <div>
-                    <label class="text-xs text-gray-400">Sensibilidad Diferencial (IΔn)</label>
-                    <select class="sector-rcd w-full bg-gray-600 border border-gray-500 rounded-md px-3 py-1.5 mt-1 text-sm">
-                        <option value="30" selected>30 mA</option><option value="100">100 mA</option><option value="300">300 mA</option>
-                        <option value="500">500 mA</option><option value="1000">1 A</option><option value="3000">3 A</option>
-                        <option value="5000">5 A</option><option value="10000">10 A</option><option value="20000">20 A</option>
-                    </select>
-                </div>
-                 <div class="mt-2">
-                    <label class="flex items-center space-x-2 text-sm cursor-pointer">
-                        <input type="checkbox" class="sector-manual-check form-checkbox h-4 w-4 text-blue-600 bg-gray-700 border-gray-500 rounded">
-                        <span>Usar objetivo manual de resistencia</span>
-                    </label>
-                    <input type="number" class="sector-manual-input w-full bg-gray-600 border-gray-500 rounded-md px-3 py-1.5 mt-2 hidden" placeholder="Ej: 5 Ω">
-                </div>
-                <div>
-                     <label class="text-xs text-gray-400">Jabalina del Sector</label>
-                    <div class="grid grid-cols-2 gap-2 mt-1">
-                        <select class="sector-l w-full bg-gray-600 border border-gray-500 rounded-md px-3 py-1.5 text-sm"><option value="1.5">1.5m</option><option value="3" selected>3m</option></select>
-                        <select class="sector-d w-full bg-gray-600 border border-gray-500 rounded-md px-3 py-1.5 text-sm"><option value="0.0127">1/2"</option><option value="0.0158">5/8"</option><option value="0.01905" selected>3/4"</option></select>
-                    </div>
-                </div>
-            </div>`;
-        newSector.querySelector('.sector-manual-check').addEventListener('change', (e) => {
-            e.target.closest('div').nextElementSibling.classList.toggle('hidden', !e.target.checked);
-        });
-        dom.sectoresContainer.appendChild(newSector);
-    }
-    document.getElementById('domiciliaria_manual_obj_check').addEventListener('change', (e) => {
-        document.getElementById('domiciliaria_manual_obj_input').classList.toggle('hidden', !e.target.checked);
-    });
-     document.getElementById('proyecto_service_manual_check').addEventListener('change', (e) => {
-        document.getElementById('proyecto_service_manual_input').classList.toggle('hidden', !e.target.checked);
-    });
-
-    function removeSector(sectorId) { document.getElementById(sectorId).remove(); }
-
-    function getInputs() {
-        const resistividad = dom.tipoSuelo.value === 'custom' ? parseFloat(dom.resistividadManual.value) : parseFloat(dom.tipoSuelo.value);
-        const mode = dom.mode_selector.value;
-        const baseParams = { mode, ul: dom.ul_condition.value, resistividad: isNaN(resistividad) ? 0 : resistividad };
-
-        if (mode === 'proyecto') {
-            baseParams.sectores = Array.from(document.querySelectorAll('.sector-card')).map(card => ({
-                name: card.querySelector('.sector-name').value,
-                rcd: card.querySelector('.sector-rcd').value,
-                l: parseFloat(card.querySelector('.sector-l').value),
-                d: parseFloat(card.querySelector('.sector-d').value),
-                manualCheck: card.querySelector('.sector-manual-check').checked,
-                manualInput: parseFloat(card.querySelector('.sector-manual-input').value)
-            }));
-            baseParams.service = {
-                 l: parseFloat(document.getElementById('proyecto_service_l').value),
-                 d: parseFloat(document.getElementById('proyecto_service_d').value),
-                 manualCheck: document.getElementById('proyecto_service_manual_check').checked,
-                 manualInput: parseFloat(document.getElementById('proyecto_service_manual_input').value)
-            };
-        } else {
-            baseParams.domiciliaria = {
-                rcd: document.getElementById('domiciliaria_rcd').value,
-                l: parseFloat(document.getElementById('domiciliaria_l').value),
-                d: parseFloat(document.getElementById('domiciliaria_d').value),
-                manualCheck: document.getElementById('domiciliaria_manual_obj_check').checked,
-                manualInput: parseFloat(document.getElementById('domiciliaria_manual_obj_input').value)
-            };
+        function minutesToTime(totalMinutes) {
+            const hours = Math.floor(totalMinutes / 60);
+            const minutes = totalMinutes % 60;
+            return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
         }
-        return baseParams;
-    }
 
-    function getPatObjective(rcd, ul, manualCheck, manualValue) {
-        if(manualCheck && !isNaN(manualValue) && manualValue > 0) return manualValue;
-        const calculated_ra = DB.aeaTable[ul]?.[rcd] || Infinity;
-        const capped_ra = DB.aeaFinalCap[rcd] || calculated_ra;
-        return Math.min(calculated_ra, capped_ra);
-    }
-    
-    function calculatePat(resistividad, longitud, diametro, objetivo) {
-        const Rj = (resistividad / (2 * Math.PI * longitud)) * Math.log((4 * longitud / diametro) - 1);
-        let numJabalinas = 0, Rt = Infinity;
-        if (Rj <= objetivo) {
-            numJabalinas = 1; Rt = Rj;
-        } else {
-            for (let i = 2; i <= 10; i++) {
-                const k = DB.parallelCoefficients[i];
-                const currentRt = k * Rj;
-                if (currentRt <= objetivo) { numJabalinas = i; Rt = currentRt; break; }
+        function findTaskForTime(day, timeInMinutes) {
+            const daySchedule = scheduleData[day] || [];
+            const taskEntry = daySchedule.find(entry => {
+                const entryStart = timeToMinutes(entry.start);
+                const entryEnd = timeToMinutes(entry.end);
+                return timeInMinutes >= entryStart && timeInMinutes <= entryEnd;
+            });
+            return taskEntry ? taskEntry.task : 'Libre';
+        }
+
+        function generateSchedule() {
+            const container = document.getElementById('schedule-container');
+            const days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+            let tableHTML = '<table id="schedule-table" class="w-full text-sm text-left text-gray-500 dark:text-gray-400 border-collapse">';
+            
+            tableHTML += '<thead class="text-xs text-gray-700 uppercase bg-gray-100 dark:bg-gray-700 dark:text-gray-400 sticky top-0 z-10"><tr><th scope="col" class="px-4 py-3 rounded-tl-lg">Hora</th>';
+            days.forEach(day => { tableHTML += `<th scope="col" class="px-4 py-3 text-center">${day}</th>`; });
+            tableHTML += '<th class="rounded-tr-lg"></th></tr></thead><tbody>';
+
+            for (let totalMinutes = 0; totalMinutes < 24 * 60; totalMinutes += 30) {
+                const timeString = minutesToTime(totalMinutes);
+                tableHTML += `<tr class="border-b dark:border-gray-700"><td class="px-4 py-4 font-medium text-gray-900 dark:text-white whitespace-nowrap">${timeString}</td>`;
+                days.forEach(day => {
+                    const taskName = findTaskForTime(day, totalMinutes);
+                    const style = getTaskStyle(taskName);
+                    
+                    tableHTML += `<td onclick="openEditModal('${day}', '${timeString}')" class="px-4 py-4 text-center table-cell-animate" style="background-color: ${style.color};">
+                        <div class="flex items-center justify-center space-x-2"><span class="text-xl">${style.emoji}</span><span class="font-semibold text-gray-700">${taskName}</span></div>
+                    </td>`;
+                });
+                tableHTML += '</tr>';
             }
-            if (numJabalinas === 0) { numJabalinas = 10; Rt = DB.parallelCoefficients[10] * Rj; }
-        }
-        const Re = longitud / Math.log(longitud / diametro);
-        return { Rj, Rt, numJabalinas, Re, cumple: Rt <= objetivo, objetivo, longitud, diametro };
-    }
-    
-    function performCalculations() {
-        const params = getInputs();
-        if (params.resistividad <= 0) {
-            alert('Por favor, ingrese un valor de resistividad válido.');
-            dom.loaderContainer.style.display = 'none';
-            dom.initialMessage.style.display = 'flex';
-            return;
+            tableHTML += '</tbody></table>';
+            container.innerHTML = tableHTML;
         }
 
-        if (params.mode === 'proyecto') {
-            const srv = params.service;
-            const srvObjective = srv.manualCheck && !isNaN(srv.manualInput) ? srv.manualInput : 1.0;
-            const patService = calculatePat(params.resistividad, srv.l, srv.d, srvObjective);
-            patService.isManual = srv.manualCheck;
+        function getTaskStyle(taskName) {
+            if (taskStyles[taskName]) return taskStyles[taskName];
+            if (!generatedColors[taskName]) {
+                let hash = 0;
+                for (let i = 0; i < taskName.length; i++) { hash = taskName.charCodeAt(i) + ((hash << 5) - hash); }
+                const h = hash % 360;
+                generatedColors[taskName] = { emoji: '✨', color: `hsl(${h}, 40%, 96%)` };
+            }
+            return generatedColors[taskName];
+        }
+        
+        function openEditModal(day, timeString) {
+            editingCell = { day, timeString };
+            const modal = document.getElementById('edit-modal');
+            const modalContent = document.getElementById('modal-content');
+            const input = document.getElementById('task-input');
+            
+            input.value = findTaskForTime(day, timeToMinutes(timeString));
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modalContent.classList.remove('scale-95', 'opacity-0');
+            }, 10);
+            input.focus();
+            input.select();
+        }
 
-            const patProteccion = params.sectores.map(sector => {
-                const objective = getPatObjective(sector.rcd, params.ul, sector.manualCheck, sector.manualInput);
-                const result = {
-                    ...calculatePat(params.resistividad, sector.l, sector.d, objective),
-                    name: sector.name, rcd: sector.rcd, isManual: sector.manualCheck
-                };
-                return result;
+        function closeModal() {
+            const modal = document.getElementById('edit-modal');
+            const modalContent = document.getElementById('modal-content');
+            modalContent.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        }
+
+        function saveTask() {
+            const newTask = document.getElementById('task-input').value.trim();
+            if (!newTask || !editingCell.day || !editingCell.timeString) return;
+
+            const { day, timeString } = editingCell;
+            const slotStart = timeToMinutes(timeString);
+            const slotEnd = slotStart + 29;
+
+            const daySchedule = scheduleData[day] || [];
+            const newDaySchedule = [];
+
+            daySchedule.forEach(entry => {
+                const entryStart = timeToMinutes(entry.start);
+                const entryEnd = timeToMinutes(entry.end);
+
+                if (entryEnd < slotStart || entryStart > slotEnd) {
+                    newDaySchedule.push(entry);
+                    return;
+                }
+                if (entryStart < slotStart) {
+                    newDaySchedule.push({ start: entry.start, end: minutesToTime(slotStart - 1), task: entry.task });
+                }
+                if (entryEnd > slotEnd) {
+                    newDaySchedule.push({ start: minutesToTime(slotEnd + 1), end: entry.end, task: entry.task });
+                }
             });
-            currentResults = { params, patService, patProteccion };
-        } else {
-            const p = params.domiciliaria;
-            const objective = getPatObjective(p.rcd, params.ul, p.manualCheck, p.manualInput);
-            const patUnica = calculatePat(params.resistividad, p.l, p.d, objective);
-            patUnica.isManual = p.manualCheck;
-            patUnica.rcd = p.rcd; // Pass rcd for result card
-            currentResults = { params, patUnica };
+
+            newDaySchedule.push({ start: timeString, end: minutesToTime(slotEnd), task: newTask });
+            newDaySchedule.sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start));
+            
+            scheduleData[day] = newDaySchedule;
+
+            closeModal();
+            generateSchedule();
         }
-        displayResults(currentResults);
-    }
 
-    function displayResults(results) {
-        dom.loaderContainer.style.display = 'none';
-        dom.resultsContainer.style.display = 'block';
-        const content = results.params.mode === 'proyecto' ? generateProjectContent(results) : generateDomiciliariaContent(results);
-        dom.resultsContainer.innerHTML = content;
-        document.querySelectorAll('.tab-button').forEach(button => button.addEventListener('click', e => switchTab(e.currentTarget)));
-        document.getElementById('results-container').addEventListener('click', (e) => {
-            if (e.target.id === 'exportTxtBtn') exportToTxt();
-            if (e.target.id === 'exportCsvBtn') exportToCsv();
-        });
-        if (window.MathJax) MathJax.typesetPromise();
-        switchTab(document.querySelector('.tab-button[data-tab="resultados"]'));
-    }
-    
-    function generateBaseLayout(title, content) {
-         return `
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 border-b border-gray-600 pb-4">
-                <h2 class="text-2xl font-semibold">${title}</h2>
-                <div class="flex space-x-2 mt-4 sm:mt-0">
-                    <button id="exportTxtBtn" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 flex items-center">
-                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                        Copiar Informe (.txt)
-                    </button>
-                    <button id="exportCsvBtn" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 flex items-center">
-                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                        Exportar a Excel (.csv)
-                    </button>
-                </div>
-            </div>
-            <div class="border-b border-gray-600 mb-6">
-                <nav class="flex space-x-1 sm:space-x-2 overflow-x-auto" aria-label="Tabs">
-                    <button class="tab-button active py-2 px-3 sm:px-4 text-sm font-medium" data-tab="resultados">Resultados</button>
-                    <button class="tab-button py-2 px-3 sm:px-4 text-sm font-medium" data-tab="calculos">Anexo: Cálculos</button>
-                    <button class="tab-button py-2 px-3 sm:px-4 text-sm font-medium" data-tab="formulas">Anexo: Fórmulas</button>
-                    <button class="tab-button py-2 px-3 sm:px-4 text-sm font-medium" data-tab="tablas">Anexo: Tablas</button>
-                </nav>
-            </div>
-            <div id="tab-content">${content}</div>`;
-    }
+        function exportToPDF() {
+            // FIX: Directly use the jsPDF constructor from the window object
+            const doc = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a3' });
+            doc.text("Mi Horario Semanal", 40, 30);
+            
+            const days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+            const head = [['Hora', ...days]];
+            const body = [];
 
-    function switchTab(clickedButton) {
-        document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
-        clickedButton.classList.add('active');
-        document.querySelectorAll('.result-section').forEach(section => section.style.display = 'none');
-        document.getElementById(`tab-${clickedButton.dataset.tab}`).style.display = 'block';
-    }
+            for (let totalMinutes = 0; totalMinutes < 24 * 60; totalMinutes += 30) {
+                const timeString = minutesToTime(totalMinutes);
+                const row = [timeString];
+                days.forEach(day => {
+                    const task = findTaskForTime(day, totalMinutes);
+                    row.push(task);
+                });
+                body.push(row);
+            }
 
-    // --- CONTENT GENERATORS ---
-    function generateProjectContent(results) { return generateBaseLayout("Resultados del Proyecto (Esquema TT)", `${generateProjectResultsTab(results)}${generateProjectCalculosTab(results)}${generateFormulasTab()}${generateTablasTab()}`); }
-    function generateDomiciliariaContent(results) { return generateBaseLayout("Resultados Verificación Domiciliaria", `${generateDomiciliariaResultsTab(results)}${generateDomiciliariaCalculosTab(results)}${generateFormulasTab()}${generateTablasTab()}`); }
-
-    function createResultCard(title, id, {Rt, Rj, numJabalinas, cumple, objetivo, rcd, isManual}) {
-        const statusClass = cumple ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-800';
-        const objectiveType = isManual ? '(Manual)' : `(Reglamento, ${rcd}mA)`;
-        return `<div class="bg-gray-700 p-4 rounded-lg flex flex-col">
-                <h4 class="font-bold text-lg text-white">${title} <span class="text-sm font-normal text-gray-400">(${id})</span></h4>
-                <div class="mt-3 space-y-2 text-sm flex-grow">
-                    <div class="flex justify-between"><span>Resistencia 1 Jabalina (Rj):</span><span class="font-semibold">${Rj.toFixed(2)} Ω</span></div>
-                    <div class="flex justify-between"><span>Objetivo ${objectiveType}:</span><span class="font-semibold">≤ ${objetivo.toFixed(1)} Ω</span></div>
-                    <hr class="border-gray-600">
-                    <div class="flex justify-between text-base"><b>Solución Propuesta:</b><span class="font-bold">${numJabalinas} Jabalina(s)</span></div>
-                    <div class="flex justify-between"><span>Resistencia Final (RT):</span><span class="font-bold text-lg">${Rt.toFixed(2)} Ω</span></div>
-                </div>
-                <div class="mt-3 text-center text-sm font-bold p-1 rounded ${statusClass}">${cumple ? 'CUMPLE' : 'NO CUMPLE'}</div>
-            </div>`;
-    }
-    function generateProjectResultsTab({ patService, patProteccion }) {
-        const serviceCard = createResultCard('Puesta a Tierra de Servicio', 'RB', patService);
-        const protectionCards = patProteccion.map((p, i) => createResultCard(p.name, `RA${i+1}`, p)).join('');
-        return `<div id="tab-resultados" class="result-section space-y-6"><div><h3 class="text-xl font-semibold text-blue-400 mb-3">1. Sistema de Servicio (Neutro)</h3><p class="text-sm text-gray-400 mb-2">Puesta a tierra para estabilidad de la red.</p>${serviceCard}</div><div><h3 class="text-xl font-semibold text-blue-400 mb-3">2. Sistemas de Protección (Masas)</h3><div class="grid grid-cols-1 md:grid-cols-2 gap-4">${protectionCards}</div></div><div><h3 class="text-xl font-semibold text-blue-400 mb-3">3. Requisito de Separación</h3><div class="bg-gray-700 p-4 rounded-lg"><p class="text-sm text-gray-400">Separación Mínima entre Jabalinas de distintos sistemas (Recomendado > 5m)</p><p class="text-2xl font-bold">${(patService.Re * 10).toFixed(2)} m</p></div></div></div>`;
-    }
-    function generateProjectCalculosTab({ patService, patProteccion, params }) {
-        const serviceCalc = `RT = K * Rj = ${DB.parallelCoefficients[patService.numJabalinas]} * ${patService.Rj.toFixed(2)} = ${patService.Rt.toFixed(2)} Ω`;
-        const protectionCalcs = patProteccion.map((p, i) => `<div class="bg-gray-700 p-4 rounded-lg"><h4 class="font-semibold mb-2 text-blue-400">Cálculo para ${p.name} (RA${i+1})</h4><p class="font-mono text-sm break-words">Rj = (${params.resistividad} / (2π * ${p.longitud})) * ln((4*${p.longitud}/${p.diametro}) - 1) = ${p.Rj.toFixed(2)} Ω</p><p class="font-mono text-sm break-words">RT = K * Rj = ${DB.parallelCoefficients[p.numJabalinas]} * ${p.Rj.toFixed(2)} = ${p.Rt.toFixed(2)} Ω</p><p class="text-xs text-gray-400 mt-2">Objetivo ${p.isManual ? '(Manual)' : `(Reglamento, ${p.rcd}mA, UL=${params.ul}V)`}: ≤ ${p.objetivo} Ω</p></div>`).join('');
-        return `<div id="tab-calculos" class="result-section space-y-4"><div class="bg-gray-700 p-4 rounded-lg"><h4 class="font-semibold mb-2 text-blue-400">Cálculo para Servicio (RB)</h4><p class="font-mono text-sm break-words">Rj (${patService.longitud}m x ${patService.diametro}m) = (${params.resistividad} / (2π * ${patService.longitud})) * ln((4*${patService.longitud}/${patService.diametro}) - 1) = ${patService.Rj.toFixed(2)} Ω</p><p class="font-mono text-sm break-words">${serviceCalc}</p></div>${protectionCalcs}</div>`;
-    }
-    function generateDomiciliariaResultsTab({ patUnica }) {
-        return `<div id="tab-resultados" class="result-section">${createResultCard('Verificación Domiciliaria', 'RA', patUnica)}</div>`;
-    }
-    function generateDomiciliariaCalculosTab({ patUnica, params }) {
-         const { Rj, Rt, numJabalinas, longitud, diametro, objetivo, rcd, isManual } = patUnica;
-         const { resistividad, ul } = params;
-         return `<div id="tab-calculos" class="result-section space-y-4">
-            <div class="bg-gray-700 p-4 rounded-lg"><h4 class="font-semibold mb-2 text-blue-400">1. Cálculo de Resistencia de Jabalina (Rj)</h4><p class="font-mono text-sm break-words">Rj = (${resistividad} / (2π * ${longitud})) * ln((4*${longitud}/${diametro}) - 1) = ${Rj.toFixed(2)} Ω</p></div>
-            <div class="bg-gray-700 p-4 rounded-lg"><h4 class="font-semibold mb-2 text-blue-400">2. Determinación de Resistencia Máxima (RA max)</h4><p class="font-mono text-sm break-words">${ isManual ? `Objetivo Manual: ${objetivo} Ω` : `RA_max = min(UL/IΔn, Límite_Tabla) = ${objetivo} Ω`}</p></div>
-            <div class="bg-gray-700 p-4 rounded-lg"><h4 class="font-semibold mb-2 text-blue-400">3. Cálculo de Sistema Final (RT)</h4><p class="font-mono text-sm break-words">${numJabalinas === 1 ? 'RT = Rj' : `RT = K * Rj = ${DB.parallelCoefficients[numJabalinas]} * ${Rj.toFixed(2)}`} = ${Rt.toFixed(2)} Ω</p></div>
-            </div>`;
-    }
-     function generateFormulasTab() {
-        return `<div id="tab-formulas" class="result-section space-y-6"><div><h4 class="font-semibold text-lg text-blue-400">Resistencia de una Jabalina (Rj)</h4><div class="bg-gray-700 p-4 rounded-lg mt-2 font-mono text-center text-lg">$$ R_j = \\left(\\frac{\\rho}{2 \\cdot \\pi \\cdot L}\\right) \\cdot \\ln\\left(\\frac{4L}{d} - 1\\right) $$</div></div><div><h4 class="font-semibold text-lg text-blue-400">Resistencia de Jabalinas en Paralelo (RT)</h4><div class="bg-gray-700 p-4 rounded-lg mt-2 font-mono text-center text-lg">$$ R_T = K \\cdot R_j $$</div></div><div><h4 class="font-semibold text-lg text-blue-400">Resistencia Máxima de Protección (RA)</h4><div class="bg-gray-700 p-4 rounded-lg mt-2 font-mono text-center text-lg">$$ R_A \\le \\frac{U_L}{I_{\\Delta n}} $$</div></div></div>`;
-    }
-    function generateTablasTab() {
-        const soilRows = Object.entries(DB.soilResistivity).map(([val, name]) => `<tr><td class="p-3">${name}</td><td class="p-3 text-right">${val} Ω·m</td></tr>`).join('');
-        const parallelRows = Object.entries(DB.parallelCoefficients).map(([n, k]) => `<tr><td class="p-3">${n}</td><td class="p-3 text-right">${k}</td></tr>`).join('');
-        const rcdRows = Object.entries(DB.aeaFinalCap).map(([rcd, res]) => `<tr><td class="p-3">${parseInt(rcd) < 1000 ? rcd + ' mA' : rcd/1000 + ' A'}</td><td class="p-3 text-right">${DB.aeaTable['50'][rcd] || '-'} Ω</td><td class="p-3 text-right">${DB.aeaTable['24'][rcd] || '-'} Ω</td><td class="p-3 text-right font-bold text-white">${res} Ω</td></tr>`).join('');
-        return `<div id="tab-tablas" class="result-section"><div class="grid grid-cols-1 gap-6"><div class="lg:col-span-2"><h4 class="font-semibold mb-3 text-blue-400">Tabla 1: Resistencia Máxima de Protección vs. Diferencial (AEA 90364)</h4><div class="overflow-x-auto bg-gray-700 rounded-lg"><table class="w-full text-sm text-left"><thead class="bg-gray-600 text-xs uppercase"><tr><th class="p-3" rowspan="2">Sensibilidad (IΔn)</th><th class="p-3 text-center" colspan="3">Resistencia Máxima (RA)</th></tr><tr><th class="p-3 text-right">UL = 50V</th><th class="p-3 text-right">UL = 24V</th><th class="p-3 text-right">Valor Final</th></tr></thead><tbody class="divide-y divide-gray-600">${rcdRows}</tbody></table></div></div><div class="grid grid-cols-1 lg:grid-cols-2 gap-6"><div><h4 class="font-semibold mb-3 text-blue-400">Tabla 2: Resistividad del Terreno</h4><div class="overflow-x-auto bg-gray-700 rounded-lg"><table class="w-full text-sm text-left"><thead class="bg-gray-600 text-xs uppercase"><tr><th class="p-3">Tipo de Suelo</th><th class="p-3 text-right">Valor</th></tr></thead><tbody class="divide-y divide-gray-600">${soilRows}</tbody></table></div></div><div><h4 class="font-semibold mb-3 text-blue-400">Tabla 3: Coeficientes Paralelo (K)</h4><div class="overflow-x-auto bg-gray-700 rounded-lg"><table class="w-full text-sm text-left"><thead class="bg-gray-600 text-xs uppercase"><tr><th class="p-3">N° Jabalinas</th><th class="p-3 text-right">K</th></tr></thead><tbody class="divide-y divide-gray-600">${parallelRows}</tbody></table></div></div></div></div></div>`;
-    }
-    
-    // --- UTILITY FUNCTIONS ---
-    function exportToTxt() {
-        if (!currentResults) { alert("Primero debe realizar un cálculo."); return; }
-        const { params } = currentResults;
-        let report = `Informe de Planificación de Puesta a Tierra (Esquema TT)\n========================================\n\n`;
-        report += `** 1. PARÁMETROS GENERALES **\nModo de Uso:\t${params.mode}\nCondiciones (UL):\t${params.ul}V\nResistividad (ρ):\t${params.resistividad} Ω·m\n\n`;
-
-        if (params.mode === 'proyecto') {
-            const { patService, patProteccion } = currentResults;
-            const d_text_service = { "0.0127": "1/2\"", "0.0158": "5/8\"", "0.01905": "3/4\"" };
-            report += `** 2. SISTEMA DE SERVICIO (RB) **\nJabalina usada:\t${params.service.l}m x ${d_text_service[params.service.d]}\nObjetivo:\t≤ ${patService.objetivo.toFixed(1)} Ω ${patService.isManual ? '(Manual)' : ''}\nResultado:\t${patService.Rt.toFixed(2)} Ω (${patService.cumple ? 'CUMPLE' : 'NO CUMPLE'})\nJabalinas:\t${patService.numJabalinas}\n\n`;
-            report += `** 3. SISTEMAS DE PROTECCIÓN (RA) **\n`;
-            patProteccion.forEach((p, i) => {
-                const d_text = { "0.0127": "1/2\"", "0.0158": "5/8\"", "0.01905": "3/4\"" };
-                report += `\tSector ${i+1}: ${p.name}\n\tJabalina usada:\t${p.longitud}m x ${d_text[p.diametro]}\n\tDiferencial:\t${p.rcd} mA\n\tObjetivo:\t≤ ${p.objetivo.toFixed(1)} Ω ${p.isManual ? '(Manual)' : ''}\n`;
-                report += `\tResultado:\t${p.Rt.toFixed(2)} Ω (${p.cumple ? 'CUMPLE' : 'NO CUMPLE'})\n\tJabalinas:\t${p.numJabalinas}\n\n`;
+            // FIX: Ensure autoTable is called correctly on the instance
+            doc.autoTable({
+                head: head,
+                body: body,
+                startY: 40,
+                theme: 'grid',
+                headStyles: { fillColor: [75, 85, 99], textColor: 255, fontStyle: 'bold' },
+                didDrawCell: function (data) {
+                    if (data.section === 'body' && data.column.index > 0) {
+                        const day = days[data.column.index - 1];
+                        const totalMinutes = data.row.index * 30;
+                        const mainTask = findTaskForTime(day, totalMinutes);
+                        const style = getTaskStyle(mainTask);
+                        data.cell.styles.fillColor = style.color;
+                    }
+                }
             });
-            report += `** 4. SEPARACIÓN REGLAMENTARIA **\n`;
-            report += `Separación mínima entre sistemas:\t${(patService.Re * 10).toFixed(2)} m\n`;
-        } else { // Domiciliaria
-            const { patUnica } = currentResults;
-            const d_text = { "0.0127": "1/2\"", "0.0158": "5/8\"", "0.01905": "3/4\"" };
-            report += `** 2. VERIFICACIÓN DOMICILIARIA **\nJabalina usada:\t${patUnica.longitud}m x ${d_text[patUnica.diametro]}\n`;
-            report += `Diferencial:\t${params.domiciliaria.rcd} mA\n`;
-            report += `Resistencia Máxima Permitida:\t≤ ${patUnica.objetivo.toFixed(1)} Ω ${patUnica.isManual ? '(Manual)' : ''}\n`;
-            report += `Resistencia Calculada (1 Jabalina):\t${patUnica.Rj.toFixed(2)} Ω\n`;
-            report += `\n** SOLUCIÓN PROPUESTA **\nJabalinas Necesarias:\t${patUnica.numJabalinas}\n`;
-            report += `Resistencia Final del Sistema (RT):\t${patUnica.Rt.toFixed(2)} Ω\n`;
-            report += `RESULTADO:\t${patUnica.cumple ? 'CUMPLE' : 'NO CUMPLE'}\n`;
+
+            doc.save('mi-horario.pdf');
         }
 
-        dom.exportTextarea.value = report.replace(/\t/g, '   ');
-        dom.exportTextarea.select();
-        try { document.execCommand('copy'); alert('¡Informe copiado al portapapeles!'); } catch (err) { alert('Error al copiar.'); }
-    }
-
-    function exportToCsv() {
-        if (!currentResults) { alert("Primero debe realizar un cálculo."); return; }
-        const { params } = currentResults;
-        let csvContent = "data:text/csv;charset=utf-8,";
-        const headers = "Tipo Sistema,Nombre/ID,Resultado,Resistencia Final (ohm),Jabalinas Necesarias,Objetivo (ohm),Resistividad (ohm.m),UL (V),Jabalina Usada,Diferencial (mA)\n";
-        csvContent += headers;
-
-        const d_text = { "0.0127": "1/2\"", "0.0158": "5/8\"", "0.01905": "3/4\"" };
-        if (params.mode === 'proyecto') {
-            const { patService, patProteccion } = currentResults;
-            const service_d_text = `${params.service.l}m x ${d_text[params.service.d]}`;
-            csvContent += `Servicio,RB,${patService.cumple ? 'CUMPLE' : 'NO CUMPLE'},${patService.Rt.toFixed(2)},${patService.numJabalinas},${patService.objetivo.toFixed(1)},${params.resistividad},N/A,${service_d_text},N/A\n`;
-            patProteccion.forEach((p, i) => {
-                 const p_d_text = `${p.longitud}m x ${d_text[p.diametro]}`;
-                 csvContent += `Proteccion,${p.name} (RA${i+1}),${p.cumple ? 'CUMPLE' : 'NO CUMPLE'},${p.Rt.toFixed(2)},${p.numJabalinas},${p.objetivo.toFixed(1)},${params.resistividad},${params.ul},${p_d_text},${p.rcd}\n`;
-            });
-        } else {
-            const { patUnica } = currentResults;
-            const p_d_text = `${patUnica.longitud}m x ${d_text[patUnica.diametro]}`;
-            csvContent += `Proteccion,Domiciliaria (RA),${patUnica.cumple ? 'CUMPLE' : 'NO CUMPLE'},${patUnica.Rt.toFixed(2)},${patUnica.numJabalinas},${patUnica.objetivo.toFixed(1)},${params.resistividad},${params.ul},${p_d_text},${params.domiciliaria.rcd}\n`;
-        }
-
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "calculo_puesta_a_tierra.csv");
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    }
-    
-    function toggleFullscreen() {
-        if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen();
-            dom.fullscreenEnter.classList.add('hidden');
-            dom.fullscreenExit.classList.remove('hidden');
-        } else {
-            if (document.exitFullscreen) {
+        function toggleFullscreen() {
+            const elem = document.getElementById('main-container');
+            if (!document.fullscreenElement) {
+                elem.requestFullscreen().catch(err => {
+                    console.error(`Error al activar pantalla completa: ${err.message}`);
+                });
+            } else {
                 document.exitFullscreen();
-                dom.fullscreenEnter.classList.remove('hidden');
-                dom.fullscreenExit.classList.add('hidden');
             }
         }
-    }
-</script>
+
+        window.onload = () => {
+            generateSchedule();
+            document.getElementById('task-input').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') saveTask();
+                if (e.key === 'Escape') closeModal();
+            });
+        };
+    </script>
 </body>
 </html>
